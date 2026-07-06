@@ -1103,6 +1103,8 @@ function renderTrafego(){
 // ── Render Anúncios ───────────────────────────────────────────────────────
 function renderAnuncios(){
   const el=document.getElementById("page-anuncios");if(!el)return;
+  // Preserva foco dos campos de busca antes de re-renderizar
+  const focusedId=document.activeElement?.id;
   const start=S.startDate,end=S.endDate;
 
   function sumPeriod(map,key){let t=0;for(const[d,n]of Object.entries(map[key]||{})){if(d>=start&&d<=end)t+=n;}return t;}
@@ -1187,6 +1189,13 @@ function renderAnuncios(){
     adResumoText=lines.join("\n");
   }
   el._adResumoText=adResumoText;
+  // Restaura foco no input de busca se estava ativo
+  if(focusedId==="camp-search-input"||focusedId==="ad-search-input"){
+    requestAnimationFrame(()=>{
+      const inp=document.getElementById(focusedId);
+      if(inp){inp.focus();const l=inp.value.length;inp.setSelectionRange(l,l);}
+    });
+  }
 
   function sc(v,m,hi){return statusColor(v,m,hi);}
   const TH="padding:10px 14px;text-align:right;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;cursor:pointer;user-select:none;border-bottom:1px solid var(--border);white-space:nowrap";
@@ -1234,7 +1243,7 @@ function renderAnuncios(){
       <span style="font-size:10px;color:var(--hint)">Clique para filtrar anúncios por campanha</span>
     </div>
     <div style="margin-bottom:8px">
-      <input type="text" placeholder="🔍 Buscar campanha..." value="${S.campSearch.replace(/"/g,'&quot;')}"
+      <input id="camp-search-input" type="text" placeholder="🔍 Buscar campanha..." value="${S.campSearch.replace(/"/g,'&quot;')}"
         oninput="setCampSearch(this.value)"
         style="width:100%;padding:7px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;box-sizing:border-box">
     </div>
@@ -1279,7 +1288,7 @@ function renderAnuncios(){
       <span style="font-size:10px;color:var(--hint)">Clique para selecionar e gerar resumo</span>
     </div>
     <div style="margin-bottom:8px">
-      <input type="text" placeholder="🔍 Buscar anúncio..." value="${S.adSearch.replace(/"/g,'&quot;')}"
+      <input id="ad-search-input" type="text" placeholder="🔍 Buscar anúncio..." value="${S.adSearch.replace(/"/g,'&quot;')}"
         oninput="setAdSearch(this.value)"
         style="width:100%;padding:7px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;box-sizing:border-box">
     </div>
