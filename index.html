@@ -212,6 +212,9 @@ const S = {
   startDate:"", endDate:"", activeQuick:"30d",
   aSort:{col:"spend",dir:"desc"},
   cSort:{col:"spend",dir:"desc"},
+  campSearch:"",
+  adSearch:"",
+  manualSpendHoje:null,
   selectedCamps:new Set(),
   selectedAds:new Set(),
   overlays:{cpl:{inv:false},ctr:{inv:false},cpm:{inv:false},cpc:{inv:false},txConvPg:{inv:false},connect:{inv:false}},
@@ -605,6 +608,14 @@ function sortAnuncios(col){
   else{S.aSort.col=col;S.aSort.dir="desc";}
   renderAnuncios();
 }
+function setCampSearch(v){S.campSearch=v;renderAnuncios();}
+function setAdSearch(v){S.adSearch=v;renderAnuncios();}
+function setManualSpendHoje(v){
+  const n=parseBRL(v.replace(/[Rr$\s]/g,"").replace(",","."));
+  S.manualSpendHoje=(isNaN(n)||n<=0)?null:n;
+  renderResumo();
+}
+function clearManualSpend(){S.manualSpendHoje=null;renderResumo();}
 function toggleCamp(name){
   if(S.selectedCamps.has(name))S.selectedCamps.delete(name);else S.selectedCamps.add(name);
   renderAnuncios();
@@ -1112,7 +1123,13 @@ function renderAnuncios(){
       cpmql:cMql>0?cSpend/cMql:0});
   }
   const {col:cCol,dir:cDir}=S.cSort;
-  const sortedCamps=[...campRows].sort((a,b)=>cDir==="asc"?a[cCol]-b[cCol]:b[cCol]-a[cCol]);
+  const sortedCampsAll=[...campRows].sort((a,b)=>{
+    const av=a[cCol]??0, bv=b[cCol]??0;
+    if(typeof av==="string")return cDir==="asc"?av.localeCompare(bv):bv.localeCompare(av);
+    return cDir==="asc"?av-bv:bv-av;
+  });
+  const campQ=S.campSearch.trim().toLowerCase();
+  const sortedCamps=campQ?sortedCampsAll.filter(c=>c.campName.toLowerCase().includes(campQ)):sortedCampsAll;
 
   // Ad rows
   const hasCampSel=S.selectedCamps.size>0;
@@ -1138,11 +1155,13 @@ function renderAnuncios(){
   const totCtr=tot.impressions>0?(tot.clicks/tot.impressions)*100:0;
 
   const {col,dir}=S.aSort;
-  const sorted=[...adRows].sort((a,b)=>{
+  const sortedAll=[...adRows].sort((a,b)=>{
     const av=a[col]??0,bv=b[col]??0;
     if(typeof av==="string")return dir==="asc"?av.localeCompare(bv):bv.localeCompare(av);
     return dir==="asc"?av-bv:bv-av;
   });
+  const adQ=S.adSearch.trim().toLowerCase();
+  const sorted=adQ?sortedAll.filter(a=>(a.adName||a.advCode).toLowerCase().includes(adQ)):sortedAll;
 
   // Ad resumo text
   const selAds=sorted.filter(a=>S.selectedAds.has(a.advCode));
@@ -1178,7 +1197,10 @@ function renderAnuncios(){
     const aC=isCamp?cCol:col,aD=isCamp?cDir:dir,active=aC===col_;
     const arrow=active?(aD==="asc"?" ↑":" ↓"):" ↕";
     const fn=isCamp?`sortCampanhas('${col_}')`:`sortAnuncios('${col_}')`;
-    return `<th onclick="${fn}" style="${TH};color:${active?"var(--text)":"var(--hint)"}">${lbl}<span style="color:${active?"#60a5fa":"var(--hint)"};font-size:9px;margin-left:3px">${arrow}</span></th>`;
+    const isName=col_==="campName"||col_==="adName";
+    const style=isName?`${THL};cursor:pointer;user-select:none`:TH;
+    const color=active?"var(--text)":"var(--hint)";
+    return `<th onclick="${fn}" style="${style};color:${color}">${lbl}<span style="color:${active?"#60a5fa":"var(--hint)"};font-size:9px;margin-left:3px">${arrow}</span></th>`;
   }
 
   function chkBox(checked){
@@ -1211,11 +1233,16 @@ function renderAnuncios(){
       ${S.selectedCamps.size>0?`<button onclick="clearCamps()" style="font-size:10px;padding:3px 9px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:#f87171;border-radius:5px;cursor:pointer;font-family:'DM Sans',sans-serif">✕ Limpar (${S.selectedCamps.size})</button>`:""}
       <span style="font-size:10px;color:var(--hint)">Clique para filtrar anúncios por campanha</span>
     </div>
+    <div style="margin-bottom:8px">
+      <input type="text" placeholder="🔍 Buscar campanha..." value="${S.campSearch.replace(/"/g,'&quot;')}"
+        oninput="setCampSearch(this.value)"
+        style="width:100%;padding:7px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;box-sizing:border-box">
+    </div>
     <div style="overflow-x:auto;margin-bottom:22px">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--card)">
           <th style="${THCK}"></th>
-          <th style="${THL}">Campanha</th>
+          ${thC("campName","Campanha",true)}
           ${thC("spend","Investimento",true)}
           ${thC("leads","Leads",true)}
           ${thC("cpl","Custo por Lead",true)}
@@ -1251,11 +1278,16 @@ function renderAnuncios(){
       ${S.selectedAds.size>0?`<button onclick="clearAds()" style="font-size:10px;padding:3px 9px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:#f87171;border-radius:5px;cursor:pointer;font-family:'DM Sans',sans-serif">✕ Limpar (${S.selectedAds.size})</button>`:""}
       <span style="font-size:10px;color:var(--hint)">Clique para selecionar e gerar resumo</span>
     </div>
+    <div style="margin-bottom:8px">
+      <input type="text" placeholder="🔍 Buscar anúncio..." value="${S.adSearch.replace(/"/g,'&quot;')}"
+        oninput="setAdSearch(this.value)"
+        style="width:100%;padding:7px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;box-sizing:border-box">
+    </div>
     <div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="background:var(--card)">
           <th style="${THCK}"></th>
-          <th style="${THL}">Anúncio</th>
+          ${thC("adName","Anúncio",false)}
           ${thC("spend","Investimento",false)}
           ${thC("leads","Leads",false)}
           ${thC("cpl","Custo por Lead",false)}
@@ -1333,7 +1365,14 @@ function renderResumo(){
 
   const tot  =periodMetrics(start,end);
   const ontem=periodMetrics(yest,yest);
-  const hoje =periodMetrics(today,today);
+  const hojeBase=periodMetrics(today,today);
+  // Investimento manual: substitui spend e recalcula CPL e Custo MQL
+  const hoje={...hojeBase};
+  if(S.manualSpendHoje!==null){
+    hoje.spend=S.manualSpendHoje;
+    hoje.cpl=hoje.trafficLeads>0?hoje.spend/hoje.trafficLeads:0;
+    hoje.cpmql=hoje.mql>0?hoje.spend/hoje.mql:0;
+  }
 
   function em(val,meta,higher){
     if(!val||val===0)return "";
@@ -1403,7 +1442,7 @@ ${blockText("⬇️","Hoje",hoje)}`;
   }
   function divider(){return `<div style="height:10px"></div>`;}
 
-  function section(icon,label,m){
+  function section(icon,label,m,isHoje=false){
     const cplE  =em(m.cpl,     META_CPL,           false);
     const cnE   =em(m.connect, METAS_T.connect.val, true);
     const pcE   =em(m.txConvPg,METAS_T.txConvPg.val,true);
@@ -1415,7 +1454,17 @@ ${blockText("⬇️","Hoje",hoje)}`;
     return `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:var(--text-strong);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">${icon} ${label}</div>
-      ${row("Investimento",fR(m.spend),"","")}
+      ${isHoje
+        ? `<div style="display:grid;grid-template-columns:220px 1fr auto;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);align-items:center">
+            <span style="color:var(--muted);font-size:12px">Investimento${S.manualSpendHoje!==null?' <span style="color:#fbbf24;font-size:9px">✎ manual</span>':''}</span>
+            <input id="invest-hoje-input" type="text" value="${S.manualSpendHoje!==null?String(S.manualSpendHoje).replace('.',','):fR(m.spend).replace('R$ ','')}"
+              onblur="setManualSpendHoje(this.value)"
+              onkeydown="if(event.key==='Enter')this.blur()"
+              style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-strong);background:var(--surf);border:1px solid rgba(251,191,36,.5);border-radius:6px;padding:2px 8px;width:100%;outline:none;text-align:left">
+            <button onclick="clearManualSpend()" title="Usar valor real" style="font-size:11px;padding:2px 8px;background:${S.manualSpendHoje!==null?'rgba(251,191,36,.15)':'transparent'};border:1px solid ${S.manualSpendHoje!==null?'rgba(251,191,36,.4)':'transparent'};color:${S.manualSpendHoje!==null?'#fbbf24':'var(--hint)'};border-radius:5px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">${S.manualSpendHoje!==null?'↩ Restaurar':'✎'}</button>
+          </div>`
+        : row("Investimento",fR(m.spend),"","")
+      }
       ${row("Aplicações Leads",m.trafficLeads,"","")}
       ${row("Custo por Aplicação",fR(m.cpl),`meta R$ ${META_CPL}`,cplE)}
       ${row("↳ frio",cplFrioStr,"","")}
@@ -1453,7 +1502,7 @@ ${blockText("⬇️","Hoje",hoje)}`;
       <div>
         ${section("📶","Total",tot)}
         ${section("⬅️","Ontem",ontem)}
-        ${section("⬇️","Hoje",hoje)}
+        ${section("⬇️","Hoje",hoje,true)}
       </div>
       <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;position:sticky;top:70px">
         <pre id="resumo-preview" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);white-space:pre-wrap;line-height:1.8;margin:0;user-select:all">${resumoText.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</pre>
