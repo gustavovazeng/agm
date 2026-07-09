@@ -1392,12 +1392,16 @@ function renderResumo(){
   const tot  =periodMetrics(start,end);
   const ontem=periodMetrics(yest,yest);
   const hojeBase=periodMetrics(today,today);
-  // Investimento manual: substitui spend e recalcula CPL e Custo MQL
+  // Investimento manual: substitui spend de hoje e propaga diferença para o consolidado
   const hoje={...hojeBase};
   if(S.manualSpendHoje!==null){
+    const diff=S.manualSpendHoje-hojeBase.spend;
     hoje.spend=S.manualSpendHoje;
     hoje.cpl=hoje.trafficLeads>0?hoje.spend/hoje.trafficLeads:0;
     hoje.cpmql=hoje.mql>0?hoje.spend/hoje.mql:0;
+    tot.spend+=diff;
+    tot.cpl=tot.trafficLeads>0?tot.spend/tot.trafficLeads:0;
+    tot.cpmql=tot.mql>0?tot.spend/tot.mql:0;
   }
 
   function em(val,meta,higher){
