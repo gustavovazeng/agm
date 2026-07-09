@@ -204,6 +204,7 @@ const S = {
   metaByCamp:{}, metaByCampByDate:{},
   metaTemp:{},
   leadsTemp:{},
+  adIdToCampName:{},
   leadsFat:{},
   leadsDesafio:{},
   leadsDisp:{},
@@ -265,6 +266,12 @@ function statusBorder(val,meta,higherIsBetter){
 }
 
 // ── Ad code extractor ─────────────────────────────────────────────────────
+function extractTemp(campName){
+  const s=(campName||"").toLowerCase();
+  if(s.includes("frio"))return"frio";
+  if(s.includes("quente"))return"quente";
+  return"";
+}
 function extractAdvCode(name){
   if(!name) return null;
   const clean=name.replace(/^teste-/i,"");
@@ -343,6 +350,7 @@ async function loadData(force=false){
 
     // ── Process Meta ─────────────────────────────────────────────────────
     const mD={},mByAd={},mByAdByDate={},mByCamp={},mByCampByDate={},metaTemp={};
+    const adIdToCampName={}; // Ad ID → Campaign Name atual (para cruzar com leads)
     for(const r of parseSheet(mj)){
       const d=toISO(r["Date"]);if(!d)continue;
       if(!mD[d])mD[d]={spend:0,clicks:0,impressions:0,metaLeads:0,landingViews:0,video75:0};
@@ -356,11 +364,13 @@ async function loadData(force=false){
       mD[d].metaLeads+=ml;mD[d].landingViews+=lv;mD[d].video75+=v75;
 
       const adName=r["Ad Name"]||"";
-      const adId=r["Ad ID"]||r["Ad Id"]||"";
+      const adId=(r["Ad ID"]||r["Ad Id"]||"").trim();
       const igUrl=r["Instagram Permalink URL"]||"";
       const campName=r["Campaign Name"]||"—";
       const advCode=extractAdvCode(adName);
-      const temp=(r["Temperatura"]||"").trim().toLowerCase();
+      const temp=extractTemp(campName);
+      // Mapa Ad ID → Campaign Name para cruzar com leads
+      if(adId&&campName&&campName!=="—") adIdToCampName[adId]=campName;
 
       if(temp){
         if(!metaTemp[temp])metaTemp[temp]={};
@@ -395,6 +405,7 @@ async function loadData(force=false){
     }
     S.meta=mD;S.metaByAd=mByAd;S.metaByAdByDate=mByAdByDate;
     S.metaByCamp=mByCamp;S.metaByCampByDate=mByCampByDate;S.metaTemp=metaTemp;
+    S.adIdToCampName=adIdToCampName;
 
     // ── Process Leads ─────────────────────────────────────────────────────
     const lD={},mqlD={},fatCount={},desafioCount={},dispCount={};
@@ -427,14 +438,6 @@ async function loadData(force=false){
         const mql=isMQL(r);
         if(mql)mqlD[d]=(mqlD[d]||0)+1;
 
-        const temp=(r["Temperatura"]||"").trim().toLowerCase();
-        if(temp){
-          if(!leadsTemp[temp])leadsTemp[temp]={};
-          if(!leadsTemp[temp][d])leadsTemp[temp][d]={traffic:0,mql:0};
-          leadsTemp[temp][d].traffic++;
-          if(mql)leadsTemp[temp][d].mql++;
-        }
-
         // Faturamento: normaliza variações de label para um valor canônico
         const FAT_NORMALIZE={
           "Entre de R$10 e R$50 milhões":   "Entre R$10 e R$50 milhões",
@@ -458,6 +461,18 @@ async function loadData(force=false){
         const campName=(r["Campanha Correta"]||r["Campaign"]||"").trim();
         const rawAd=(r["Anúncio Correto"]||r["Content"]||r["Term"]||"").trim();
         const advCode=extractAdvCode(rawAd)||(rawAd?rawAd.toLowerCase():null);
+
+        // Temperatura: extrai Ad ID do Content UTM → busca Campaign Name atual no Meta → frio/quente
+        function extractIdFromUtm(s){ const m=(s||"").match(/_id_(\d+)/); return m?m[1]:""; }
+        const adIdFromContent=extractIdFromUtm(r["Content"]||r["Anúncio Correto"]||"");
+        const campNameAtual=adIdFromContent?(S.adIdToCampName[adIdFromContent]||campName):campName;
+        const temp=extractTemp(campNameAtual);
+        if(temp){
+          if(!leadsTemp[temp])leadsTemp[temp]={};
+          if(!leadsTemp[temp][d])leadsTemp[temp][d]={traffic:0,mql:0};
+          leadsTemp[temp][d].traffic++;
+          if(mql)leadsTemp[temp][d].mql++;
+        }
 
         if(campName){
           if(!lByCamp[campName])lByCamp[campName]={};
@@ -611,7 +626,9 @@ function sortAnuncios(col){
 function setCampSearch(v){S.campSearch=v;renderAnuncios();}
 function setAdSearch(v){S.adSearch=v;renderAnuncios();}
 function setManualSpendHoje(v){
-  const n=parseBRL(v.replace(/[Rr$\s]/g,"").replace(",","."));
+  // Remove R$, espaços, pontos de milhar → troca vírgula decimal por ponto
+  const cleaned=v.replace(/[Rr$\s]/g,"").replace(/\./g,"").replace(",",".");
+  const n=parseFloat(cleaned);
   S.manualSpendHoje=(isNaN(n)||n<=0)?null:n;
   renderResumo();
 }
