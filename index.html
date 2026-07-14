@@ -249,7 +249,7 @@ const S = {
   overlays:{cpl:{inv:false},ctr:{inv:false},cpm:{inv:false},cpc:{inv:false},txConvPg:{inv:false},connect:{inv:false}},
   currentPage:"principal",
   updated:null,
-  loading:true, error:null, firstLoad:true,
+  loading:true, error:null, distError:null, firstLoad:true,
 };
 
 // ── Date helpers (GMT-3 Brasil) ───────────────────────────────────────────
@@ -367,13 +367,24 @@ function parseSheet(json){
 
 // ── Load data ─────────────────────────────────────────────────────────────
 async function loadData(force=false){
-  S.loading=true; S.error=null; render();
+  S.loading=true; S.error=null; S.distError=null; render();
   try{
-    const [metaText, leadsText, distSegText] = await Promise.all([
-      fetch(GS_URL("Base Meta")).then(r=>{ if(!r.ok)throw new Error("Erro ao buscar Base Meta: "+r.status); return r.text(); }),
-      fetch(GS_URL("Base leads")).then(r=>{ if(!r.ok)throw new Error("Erro ao buscar Base leads: "+r.status); return r.text(); }),
-      fetch(GS_URL("Base Seguidores AGM")).then(r=>{ if(!r.ok)throw new Error("Erro ao buscar Base Seguidores: "+r.status); return r.text(); }),
+    // Fetches do Perpétuo (obrigatórios)
+    const [metaText, leadsText] = await Promise.all([
+      fetch(GS_URL("Base Meta")).then(r=>{ if(!r.ok)throw new Error("Base Meta: "+r.status); return r.text(); }),
+      fetch(GS_URL("Base leads")).then(r=>{ if(!r.ok)throw new Error("Base leads: "+r.status); return r.text(); }),
     ]);
+
+    // Fetch da Distribuição (independente — não quebra o Perpétuo se falhar)
+    let distSegText="";
+    try{
+      const dr=await fetch(GS_URL("Base Seguidores AGM"));
+      if(!dr.ok)throw new Error("Status "+dr.status);
+      distSegText=await dr.text();
+    }catch(segErr){
+      S.distError="Não foi possível carregar Base Seguidores AGM: "+segErr.message;
+      console.warn("Base Seguidores AGM:",segErr.message);
+    }
     const mj = parseCSVText(metaText);
     const lj = parseCSVText(leadsText);
 
@@ -1871,6 +1882,9 @@ function drawProfileBar(id,data,cssW,cssH){
 // ── Render Principal (Seguidores) ─────────────────────────────────────────
 function renderPrincipalSeg(){
   const el=document.getElementById("page-principal");if(!el)return;
+  if(S.distError&&Object.keys(S.distMeta).length===0){
+    el.innerHTML=`<div class="err" style="margin-top:24px">⚠️ ${S.distError}</div>`;return;
+  }
   const daily=getDailyDist(S.startDate,S.endDate);
   const tot=getTotalsDist(daily);
   el.innerHTML=`
