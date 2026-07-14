@@ -369,10 +369,9 @@ function parseSheet(json){
 async function loadData(force=false){
   S.loading=true; S.error=null; render();
   try{
-    const [metaText, leadsText, distMetaText, distSegText] = await Promise.all([
+    const [metaText, leadsText, distSegText] = await Promise.all([
       fetch(GS_URL("Base Meta")).then(r=>{ if(!r.ok)throw new Error("Erro ao buscar Base Meta: "+r.status); return r.text(); }),
       fetch(GS_URL("Base leads")).then(r=>{ if(!r.ok)throw new Error("Erro ao buscar Base leads: "+r.status); return r.text(); }),
-      fetch(GS_URL("Base Meta - Seguidores AGM")).then(r=>{ if(!r.ok)throw new Error("Erro ao buscar Base Meta Seguidores: "+r.status); return r.text(); }),
       fetch(GS_URL("Base Seguidores AGM")).then(r=>{ if(!r.ok)throw new Error("Erro ao buscar Base Seguidores: "+r.status); return r.text(); }),
     ]);
     const mj = parseCSVText(metaText);
@@ -523,65 +522,64 @@ async function loadData(force=false){
     S.leadsTemp=leadsTemp;S.leadsByAd=lByAd;S.leadsByCamp=lByCamp;
     S.mqlByAd=mqlByAd;S.mqlByCamp=mqlByCamp;
 
-    // ── Process Seguidores Meta ───────────────────────────────────────────
-    const distMetaJ=parseCSVText(distMetaText);
+    // ── Process Base Seguidores AGM (aba única) ───────────────────────────
+    // Colunas em português: Dia, Nome da campanha, Nome do anúncio,
+    // Seguidores no Instagram, Visitas ao perfil do Instagram,
+    // Valor usado (BRL), Cliques no link, Impressões,
+    // Identificação do anúncio, Reproduções do vídeo por no mínimo 3 segundos,
+    // Reproduções de 25% do vídeo
+    const distSegJ=parseCSVText(distSegText);
     const dMeta={},dMetaByAd={},dMetaByAdByDate={},dMetaByCampByDate={};
-    for(const r of parseSheet(distMetaJ)){
-      const d=toISO(r["Date"]);if(!d)continue;
-      const sp=parseBRL(r["Spend (Cost, Amount Spent)"]);
-      const cl=parseInt(r["Action Link Clicks"]||0)||0;
-      const im=parseInt(r["Impressions"]||0)||0;
-      const pv=parseInt(r["Instagram Profile Visits"]||0)||0;
-      const v3=parseInt(r["Action 3s Video Views"]||r["Action Video View"]||0)||0;
-      const v15=parseInt(r["Video 15 Sec Watched Actions"]||0)||0;
+    const dSeg={},dSegByCamp={},dSegByAd={};
+    for(const r of parseSheet(distSegJ)){
+      const d=toISO(r["Dia"]);if(!d)continue;
+      // Spend: "Valor usado (BRL)" usa ponto como decimal — parseFloat direto
+      const sp=parseFloat((r["Valor usado (BRL)"]||"0").replace(",","."))||0;
+      const cl=parseInt(r["Cliques no link"]||0)||0;
+      const im=parseInt(r["Impressões"]||0)||0;
+      const pv=parseInt(r["Visitas ao perfil do Instagram"]||0)||0;
+      const seg=parseInt(r["Seguidores no Instagram"]||0)||0;
+      const v3=parseInt(r["Reproduções do vídeo por no mínimo 3 segundos"]||0)||0;
+      // Hold Rate: usa 25% (não há 15s) — armazenado em video15s p/ compatibilidade
+      const v15=parseInt(r["Reproduções de 25% do vídeo"]||0)||0;
+      const adName=(r["Nome do anúncio"]||"").trim();
+      const campName=(r["Nome da campanha"]||"").trim()||"—";
+
+      // ── distMeta (gastos + tráfego por dia) ──
       if(!dMeta[d])dMeta[d]={spend:0,clicks:0,impressions:0,profileVisits:0,video3s:0,video15s:0};
       dMeta[d].spend+=sp;dMeta[d].clicks+=cl;dMeta[d].impressions+=im;
       dMeta[d].profileVisits+=pv;dMeta[d].video3s+=v3;dMeta[d].video15s+=v15;
-      const adName=r["Ad Name"]||"";
-      const campName=r["Campaign Name"]||"—";
-      const igUrl=r["Instagram Permalink URL"]||"";
+
+      // ── distSeg (seguidores por dia) ──
+      if(!dSeg[d])dSeg[d]={seguidores:0,profileVisits:0};
+      dSeg[d].seguidores+=seg;dSeg[d].profileVisits+=pv;
+
+      // ── por anúncio ──
       if(adName){
         if(!dMetaByAd[adName])dMetaByAd[adName]={adName,igUrl:"",camps:new Set()};
-        if(igUrl&&!dMetaByAd[adName].igUrl)dMetaByAd[adName].igUrl=igUrl;
         if(campName&&campName!=="—")dMetaByAd[adName].camps.add(campName);
         if(!dMetaByAdByDate[adName])dMetaByAdByDate[adName]={};
         if(!dMetaByAdByDate[adName][d])dMetaByAdByDate[adName][d]={spend:0,clicks:0,impressions:0,profileVisits:0,igUrl:""};
         dMetaByAdByDate[adName][d].spend+=sp;dMetaByAdByDate[adName][d].clicks+=cl;
         dMetaByAdByDate[adName][d].impressions+=im;dMetaByAdByDate[adName][d].profileVisits+=pv;
-        if(igUrl&&!dMetaByAdByDate[adName][d].igUrl)dMetaByAdByDate[adName][d].igUrl=igUrl;
+        if(!dSegByAd[adName])dSegByAd[adName]={};
+        if(!dSegByAd[adName][d])dSegByAd[adName][d]={seguidores:0,profileVisits:0};
+        dSegByAd[adName][d].seguidores+=seg;dSegByAd[adName][d].profileVisits+=pv;
       }
+
+      // ── por campanha ──
       if(campName&&campName!=="—"){
         if(!dMetaByCampByDate[campName])dMetaByCampByDate[campName]={};
         if(!dMetaByCampByDate[campName][d])dMetaByCampByDate[campName][d]={spend:0,clicks:0,impressions:0,profileVisits:0};
         dMetaByCampByDate[campName][d].spend+=sp;dMetaByCampByDate[campName][d].clicks+=cl;
         dMetaByCampByDate[campName][d].impressions+=im;dMetaByCampByDate[campName][d].profileVisits+=pv;
-      }
-    }
-    S.distMeta=dMeta;S.distMetaByAd=dMetaByAd;
-    S.distMetaByAdByDate=dMetaByAdByDate;S.distMetaByCampByDate=dMetaByCampByDate;
-
-    // ── Process Seguidores Orgânico ───────────────────────────────────────
-    const distSegJ=parseCSVText(distSegText);
-    const dSeg={},dSegByCamp={},dSegByAd={};
-    for(const r of parseSheet(distSegJ)){
-      const d=toISO(r["Dia"]);if(!d)continue;
-      const seg=parseInt(r["Seguidores no Instagram"]||0)||0;
-      const pv=parseInt(r["Visitas ao perfil do Instagram"]||0)||0;
-      if(!dSeg[d])dSeg[d]={seguidores:0,profileVisits:0};
-      dSeg[d].seguidores+=seg;dSeg[d].profileVisits+=pv;
-      const campName=r["Nome da campanha"]||"";
-      const adName=r["Nome do anúncio"]||"";
-      if(campName){
         if(!dSegByCamp[campName])dSegByCamp[campName]={};
         if(!dSegByCamp[campName][d])dSegByCamp[campName][d]={seguidores:0,profileVisits:0};
         dSegByCamp[campName][d].seguidores+=seg;dSegByCamp[campName][d].profileVisits+=pv;
       }
-      if(adName){
-        if(!dSegByAd[adName])dSegByAd[adName]={};
-        if(!dSegByAd[adName][d])dSegByAd[adName][d]={seguidores:0,profileVisits:0};
-        dSegByAd[adName][d].seguidores+=seg;dSegByAd[adName][d].profileVisits+=pv;
-      }
     }
+    S.distMeta=dMeta;S.distMetaByAd=dMetaByAd;
+    S.distMetaByAdByDate=dMetaByAdByDate;S.distMetaByCampByDate=dMetaByCampByDate;
     S.distSeg=dSeg;S.distSegByCamp=dSegByCamp;S.distSegByAd=dSegByAd;
 
     const allDates=Object.keys(mD).sort();
