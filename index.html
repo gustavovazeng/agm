@@ -394,10 +394,10 @@ async function loadData(force=false){
       S.distError="Não foi possível carregar Base Seguidores AGM: "+segErr.message;
       console.warn("Base Seguidores AGM:",segErr.message);
     }
-    // Fetch da Distribuição Renato (independente)
+    // Fetch da Distribuição Renato (independente — usa gid para maior confiabilidade)
     let rentSegText="";
     try{
-      const rr=await fetch(GS_URL("Base Seguidores Renato"));
+      const rr=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=496567258`);
       if(!rr.ok)throw new Error("Status "+rr.status);
       rentSegText=await rr.text();
     }catch(rentErr){
@@ -426,7 +426,7 @@ async function loadData(force=false){
       const adId=(r["Ad ID"]||r["Ad Id"]||"").trim();
       const igUrl=r["Instagram Permalink URL"]||"";
       const campName=r["Campaign Name"]||"—";
-      const advCode=extractAdvCode(adName)||(adName||null);
+      const advCode=extractAdvCode(adName)||(adName?adName.toLowerCase():null);
       const temp=extractTemp(campName);
       // Mapa Ad ID → Campaign Name para cruzar com leads
       if(adId&&campName&&campName!=="—") adIdToCampName[adId]=campName;
