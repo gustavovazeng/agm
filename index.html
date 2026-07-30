@@ -20,6 +20,11 @@ html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-seri
   display:flex;align-items:center;justify-content:space-between;gap:16px}
 .funil-wrap{position:relative}
 .funil-btn{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9px;border:1px solid var(--border);background:var(--surf);cursor:pointer;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;transition:border-color .15s}
+.tf-wrap{display:flex;align-items:center;gap:6px}
+.tf-lbl{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+.tf-btn{padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;cursor:pointer;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;transition:all .15s;white-space:nowrap}
+.tf-btn.active{background:var(--surf);border-color:var(--green);color:var(--text-strong);font-weight:600}
+.tf-btn.active::before{content:"● ";color:var(--green);font-size:9px}
 .funil-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
 .funil-name{font-size:12px;font-weight:600;color:var(--text-strong)}
 .funil-status{font-size:9px;color:var(--green);letter-spacing:.04em}
@@ -228,6 +233,8 @@ const S = {
   metaTemp:{},
   leadsTemp:{},
   adIdToCampName:{}, adIdToAdvCode:{},
+  linkedinMeta:{}, linkedinError:null,
+  trafficFilter:"all",
   leadsFat:{},
   leadsDesafio:{},
   leadsDisp:{},
@@ -376,7 +383,7 @@ function parseSheet(json){
 
 // ── Load data ─────────────────────────────────────────────────────────────
 async function loadData(force=false){
-  S.loading=true; S.error=null; S.distError=null; S.rentError=null; render();
+  S.loading=true; S.error=null; S.distError=null; S.rentError=null; S.linkedinError=null; render();
   try{
     // Fetches do Perpétuo (obrigatórios)
     const [metaText, leadsText] = await Promise.all([
@@ -403,6 +410,16 @@ async function loadData(force=false){
     }catch(rentErr){
       S.rentError="Não foi possível carregar Base Seguidores Renato: "+rentErr.message;
       console.warn("Base Seguidores Renato:",rentErr.message);
+    }
+    // Fetch LinkedIn (independente)
+    let linkedinText="";
+    try{
+      const lr=await fetch(GS_URL("Base Linkedin"));
+      if(!lr.ok)throw new Error("Status "+lr.status);
+      linkedinText=await lr.text();
+    }catch(liErr){
+      S.linkedinError="Não foi possível carregar Base Linkedin: "+liErr.message;
+      console.warn("Base Linkedin:",liErr.message);
     }
     const mj = parseCSVText(metaText);
     const lj = parseCSVText(leadsText);
@@ -660,6 +677,22 @@ async function loadData(force=false){
     S.rentMetaByAdByDate=rMetaByAdByDate;S.rentMetaByCampByDate=rMetaByCampByDate;
     S.rentSeg=rSeg;S.rentSegByCamp=rSegByCamp;S.rentSegByAd=rSegByAd;
 
+    // ── Process Base Linkedin ─────────────────────────────────────────────
+    // Colunas (posicional — header tem "Campaign Name" duplicado):
+    // [0] Date  [1] Cost  [2] Action Clicks  [3] Impressions  [5] Campaign Name
+    const liRows=(parseCSVText(linkedinText).values||[]);
+    const liMeta={};
+    for(const row of liRows.slice(1)){
+      if(!row||!row[0])continue;
+      const d=toISO(row[0].trim());if(!d)continue;
+      const sp=parseFloat((row[1]||"0").replace(",","."))||0;
+      const cl=parseInt(row[2]||0)||0;
+      const im=parseInt(row[3]||0)||0;
+      if(!liMeta[d])liMeta[d]={spend:0,clicks:0,impressions:0};
+      liMeta[d].spend+=sp;liMeta[d].clicks+=cl;liMeta[d].impressions+=im;
+    }
+    S.linkedinMeta=liMeta;
+
     const allDates=Object.keys(mD).sort();
     S.updated=allDates.length?fDateBR(allDates[allDates.length-1]):"—";
     if(!S.startDate){S.startDate=nDaysAgoISO(29);S.endDate=todayISO();S.activeQuick="30d";}
@@ -810,6 +843,7 @@ function sortAnuncios(col){
 }
 function setCampSearch(v){S.campSearch=v;_isSeg()?renderAnunciosSeg():renderAnuncios();}
 function setAdSearch(v){S.adSearch=v;_isSeg()?renderAnunciosSeg():renderAnuncios();}
+function setTrafficFilter(f){S.trafficFilter=f;renderPrincipal();}
 function setManualSpendHoje(v){
   const cleaned=v.replace(/[Rr$\s]/g,"").replace(/\./g,"").replace(",",".");
   const n=parseFloat(cleaned);
@@ -1102,9 +1136,26 @@ function statusLegend(){
 // ── Render Principal ──────────────────────────────────────────────────────
 function renderPrincipal(){
   const el=document.getElementById("page-principal");if(!el)return;
-  const daily=getDaily(S.startDate,S.endDate);
+  const metaDaily=getDaily(S.startDate,S.endDate);
+  // Merge datas Meta + LinkedIn no período
+  const allDatesSet=new Set([...metaDaily.map(d=>d.date),...Object.keys(S.linkedinMeta).filter(d=>d>=S.startDate&&d<=S.endDate)]);
+  const metaByDate=Object.fromEntries(metaDaily.map(d=>[d.date,d]));
+  const daily=Array.from(allDatesSet).sort().map(date=>{
+    const m=metaByDate[date]||{date,label:fDate(date),spend:0,trafficLeads:0,organicLeads:0,mql:0,cpl:0,cpmql:0};
+    const li=(S.linkedinMeta[date]||{spend:0}).spend;
+    let spend;
+    if(S.trafficFilter==="linkedin")spend=li;
+    else if(S.trafficFilter==="all")spend=m.spend+li;
+    else spend=m.spend;
+    return{...m,spend,
+      cpl:m.trafficLeads>0?spend/m.trafficLeads:0,
+      cpmql:m.mql>0?spend/m.mql:0,
+    };
+  });
   const tot=getTotals(daily);
   const cplC=statusColor(tot.cpl,META_CPL,false);
+  const liHasData=Object.keys(S.linkedinMeta).length>0;
+  const f=S.trafficFilter;
   el.innerHTML=`
     <div class="hdr" style="margin-bottom:6px">
       <div>
@@ -1114,6 +1165,12 @@ function renderPrincipal(){
       <div style="display:flex;align-items:center;gap:16px">${statusLegend()}</div>
     </div>
     ${S.error?`<div class="err">⚠️ ${S.error}</div>`:""}
+    ${liHasData?`<div class="tf-wrap" style="margin-bottom:14px">
+      <span class="tf-lbl">Tráfego:</span>
+      <button class="tf-btn${f==="all"?" active":""}" onclick="setTrafficFilter('all')">Consolidado</button>
+      <button class="tf-btn${f==="meta"?" active":""}" onclick="setTrafficFilter('meta')">Meta</button>
+      <button class="tf-btn${f==="linkedin"?" active":""}" onclick="setTrafficFilter('linkedin')">LinkedIn</button>
+    </div>`:""}
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:13px;margin-bottom:16px">
       ${kpiCard("Investimento",fBRL(tot.spend),"","var(--text-strong)")}
       ${kpiCard("Aplicações (Leads)",tot.trafficLeads.toLocaleString("pt-BR"),"","var(--text-strong)")}
