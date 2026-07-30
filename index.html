@@ -1669,6 +1669,8 @@ function renderResumo(){
   function periodMetrics(s,e){
     const daily=getDailyT(s,e);
     const t=getTotalsT(daily);
+    // Soma LinkedIn ao investimento (sem filtro — resumo sempre mostra consolidado)
+    for(const[d,li] of Object.entries(S.linkedinMeta)){if(d>=s&&d<=e)t.spend+=li.spend;}
     let tLeads=0,mqlCount=0;
     for(const[d,l] of Object.entries(S.leadsD)){if(d>=s&&d<=e)tLeads+=l.traffic;}
     for(const[d,n] of Object.entries(S.mqlD)){if(d>=s&&d<=e)mqlCount+=n;}
