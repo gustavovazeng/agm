@@ -1142,14 +1142,20 @@ function renderPrincipal(){
   const metaByDate=Object.fromEntries(metaDaily.map(d=>[d.date,d]));
   const daily=Array.from(allDatesSet).sort().map(date=>{
     const m=metaByDate[date]||{date,label:fDate(date),spend:0,trafficLeads:0,organicLeads:0,mql:0,cpl:0,cpmql:0};
-    const li=(S.linkedinMeta[date]||{spend:0}).spend;
-    let spend;
-    if(S.trafficFilter==="linkedin")spend=li;
-    else if(S.trafficFilter==="all")spend=m.spend+li;
-    else spend=m.spend;
-    return{...m,spend,
-      cpl:m.trafficLeads>0?spend/m.trafficLeads:0,
-      cpmql:m.mql>0?spend/m.mql:0,
+    const liSpend=(S.linkedinMeta[date]||{spend:0}).spend;
+    let spend,trafficLeads,mql;
+    if(S.trafficFilter==="linkedin"){
+      // LinkedIn não tem atribuição de leads/MQL ainda — mostra só o investimento da plataforma
+      spend=liSpend; trafficLeads=0; mql=0;
+    } else if(S.trafficFilter==="all"){
+      spend=m.spend+liSpend; trafficLeads=m.trafficLeads; mql=m.mql;
+    } else {
+      // meta
+      spend=m.spend; trafficLeads=m.trafficLeads; mql=m.mql;
+    }
+    return{...m,spend,trafficLeads,mql,
+      cpl:trafficLeads>0?spend/trafficLeads:0,
+      cpmql:mql>0?spend/mql:0,
     };
   });
   const tot=getTotals(daily);
