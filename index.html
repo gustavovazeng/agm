@@ -216,6 +216,27 @@ const METAS_T = {
   txConvPg: {val:7,    higher:true},
 };
 
+// Metas Distribuição AGM (01/07 a 31/07)
+const META_DIST_AGM = {
+  spend:            4751.48,
+  profileVisits:    19727,
+  custoPorVisita:   0.24,
+  seguidores:       1768,
+  custoPorSeguidor: 2.69,
+  hookRate:         8.2,
+  holdRate:         73.4,
+};
+// Metas Distribuição Renato (28/07 a 31/07)
+const META_DIST_RENATO = {
+  spend:            285.77,
+  profileVisits:    3493,
+  custoPorVisita:   0.08,
+  seguidores:       211,
+  custoPorSeguidor: 1.35,
+  hookRate:         58.3,
+  holdRate:         44.7,
+};
+
 // Chart colors
 const CHART_COLOR = "#3b82f6";
 const CHART_INV   = "#3b82f6";
@@ -2039,6 +2060,7 @@ function renderPrincipalSeg(){
   }
   const daily=getDailyDist(S.startDate,S.endDate);
   const tot=getTotalsDist(daily);
+  const META_D=S.activeDash==="renato"?META_DIST_RENATO:META_DIST_AGM;
   el.innerHTML=`
     <div class="hdr" style="margin-bottom:6px">
       <div>
@@ -2049,11 +2071,11 @@ function renderPrincipalSeg(){
     </div>
     ${S.error?`<div class="err">⚠️ ${S.error}</div>`:""}
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:13px;margin-bottom:16px">
-      ${kpiCard("Investimento",fBRL(tot.spend),"","var(--text-strong)")}
-      ${kpiCard("Visitas ao Perfil",tot.profileVisits.toLocaleString("pt-BR"),"","var(--text-strong)")}
-      ${kpiCard("Custo/Visita",tot.custoPorVisita>0?fBRL(tot.custoPorVisita):"—","","var(--text-strong)")}
-      ${kpiCard("Seguidores",tot.seguidores.toLocaleString("pt-BR"),"","var(--text-strong)")}
-      ${kpiCard("Custo/Seguidor",tot.custoPorSeguidor>0?fBRL(tot.custoPorSeguidor):"—","","var(--text-strong)")}
+      ${kpiCard("Investimento",fBRL(tot.spend),`meta ${fBRL(META_D.spend)}`,"var(--text-strong)")}
+      ${kpiCard("Visitas ao Perfil",tot.profileVisits.toLocaleString("pt-BR"),`meta ${META_D.profileVisits.toLocaleString("pt-BR")}`,statusColor(tot.profileVisits,META_D.profileVisits,true),false,tot.profileVisits,META_D.profileVisits,true)}
+      ${kpiCard("Custo/Visita",tot.custoPorVisita>0?fBRL(tot.custoPorVisita):"—",`meta ${fBRL(META_D.custoPorVisita)}`,statusColor(tot.custoPorVisita,META_D.custoPorVisita,false),false,tot.custoPorVisita,META_D.custoPorVisita,false)}
+      ${kpiCard("Seguidores",tot.seguidores.toLocaleString("pt-BR"),`meta ${META_D.seguidores.toLocaleString("pt-BR")}`,statusColor(tot.seguidores,META_D.seguidores,true),false,tot.seguidores,META_D.seguidores,true)}
+      ${kpiCard("Custo/Seguidor",tot.custoPorSeguidor>0?fBRL(tot.custoPorSeguidor):"—",`meta ${fBRL(META_D.custoPorSeguidor)}`,statusColor(tot.custoPorSeguidor,META_D.custoPorSeguidor,false),false,tot.custoPorSeguidor,META_D.custoPorSeguidor,false)}
     </div>
     <div class="cc" style="margin-bottom:12px;position:relative">
       <div class="ch">
@@ -2110,20 +2132,26 @@ function renderTrafegoSeg(){
   const p3Start=subDays(today,3),p3End=subDays(today,1);
   const p3Tot=getTotalsDist(getDailyDist(p3Start,p3End));
   const daily=getDailyDist(S.startDate,S.endDate);
+  const META_D=S.activeDash==="renato"?META_DIST_RENATO:META_DIST_AGM;
   const METRICS=[
     {key:"spend",lbl:"Investimento",fmt:fBRL},
-    {key:"custoPorVisita",lbl:"Custo/Visita",fmt:fBRL},
+    {key:"custoPorVisita",lbl:"Custo/Visita",fmt:fBRL,meta:META_D.custoPorVisita,higher:false},
     {key:"cpc",lbl:"CPC",fmt:fBRL},
     {key:"ctr",lbl:"CTR",fmt:fPct},
     {key:"cpm",lbl:"CPM",fmt:fBRL},
-    {key:"hookRate",lbl:"Hook Rate",fmt:fPct},
-    {key:"holdRate",lbl:"Hold Rate",fmt:fPct},
+    {key:"hookRate",lbl:"Hook Rate",fmt:fPct,meta:META_D.hookRate,higher:true},
+    {key:"holdRate",lbl:"Hold Rate",fmt:fPct,meta:META_D.holdRate,higher:true},
     {key:"txConvSeg",lbl:"Tx Conv. Seguidor",fmt:fPct},
   ];
-  function metricsRow(d){return METRICS.map(m=>`<div class="kc" style="padding:12px 14px">
-    <div class="kc-lbl">${m.lbl}</div>
-    <div class="kc-val" style="color:var(--text-strong);font-size:17px">${m.fmt(d[m.key]||0)}</div>
-  </div>`).join("");}
+  function metricsRow(d){return METRICS.map(m=>{
+    const color=m.meta!=null?statusColor(d[m.key]||0,m.meta,m.higher):"var(--text-strong)";
+    const sub=m.meta!=null?`<div class="kc-sub" style="font-size:11px;color:#8a96ab;margin-top:2px">meta ${m.fmt(m.meta)}</div>`:"";
+    return `<div class="kc" style="padding:12px 14px">
+      <div class="kc-lbl">${m.lbl}</div>
+      <div class="kc-val" style="color:${color};font-size:17px">${m.fmt(d[m.key]||0)}</div>
+      ${sub}
+    </div>`;
+  }).join("");}
   const CHART_CFGS=[
     {key:"ctr",lbl:"CTR",fmt:fPct},{key:"cpm",lbl:"CPM",fmt:fBRL},
     {key:"cpc",lbl:"CPC",fmt:fBRL},{key:"hookRate",lbl:"Hook Rate",fmt:fPct},
