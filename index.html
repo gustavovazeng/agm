@@ -572,10 +572,10 @@ async function loadData(force=false){
           if(mql)leadsTemp[temp][d].mql++;
         }
 
-        if(campName){
-          if(!lByCamp[campName])lByCamp[campName]={};
-          lByCamp[campName][d]=(lByCamp[campName][d]||0)+1;
-          if(mql){if(!mqlByCamp[campName])mqlByCamp[campName]={};mqlByCamp[campName][d]=(mqlByCamp[campName][d]||0)+1;}
+        if(campNameAtual){
+          if(!lByCamp[campNameAtual])lByCamp[campNameAtual]={};
+          lByCamp[campNameAtual][d]=(lByCamp[campNameAtual][d]||0)+1;
+          if(mql){if(!mqlByCamp[campNameAtual])mqlByCamp[campNameAtual]={};mqlByCamp[campNameAtual][d]=(mqlByCamp[campNameAtual][d]||0)+1;}
         }
         if(advCode){
           if(!lByAd[advCode])lByAd[advCode]={};
