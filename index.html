@@ -2431,9 +2431,15 @@ function renderResumoSeg(){
   const dateLabel=start===end?fDM(start):`${fDM(start)} a ${fDM(end)}`;
   const META_D=S.activeDash==="renato"?META_DIST_RENATO:META_DIST_AGM;
   function fBRLR(n){return "R$ "+(n||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});}
-  function row(lbl,val,color="var(--text-strong)",metaSub=""){return `<div style="display:grid;grid-template-columns:200px 1fr;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);align-items:center">
+  function em(val,meta,higher){
+    if(!val||val===0)return "";
+    const ratio=higher?val/meta:meta/val;
+    if(ratio>=1)return "🟢";if(ratio>=0.85)return "🟡";return "🔴";
+  }
+  function row(lbl,val,metaStr,emoji){return `<div style="display:grid;grid-template-columns:200px 1fr auto;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);align-items:center">
     <span style="color:var(--muted);font-size:12px">${lbl}</span>
-    <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:${color}">${val||"—"}${metaSub?`<span style="font-size:10px;color:#8a96ab;margin-left:8px">${metaSub}</span>`:""}</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-strong)">${val||"—"}</span>
+    <span style="font-size:13px;min-width:28px;text-align:right">${emoji||""}<span style="font-size:10px;color:var(--hint);margin-left:4px">${metaStr||""}</span></span>
   </div>`;}
   function sectionSeg(label,m,isHoje=false){
     const isManual=isHoje&&S.manualSpendHoje!==null;
@@ -2460,19 +2466,35 @@ function renderResumoSeg(){
     return `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:var(--text-strong);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">${label}</div>
       ${investRow}
-      ${row("Visitas ao Perfil",m.profileVisits.toLocaleString("pt-BR"),statusColor(m.profileVisits,META_D.profileVisits,true),`meta ${META_D.profileVisits.toLocaleString("pt-BR")}`)}
-      ${row("Custo/Visita",m.custoPorVisita>0?fBRLR(m.custoPorVisita):"—",statusColor(m.custoPorVisita,META_D.custoPorVisita,false),`meta ${fBRLR(META_D.custoPorVisita)}`)}
-      ${row("Seguidores",m.seguidores.toLocaleString("pt-BR"),statusColor(m.seguidores,META_D.seguidores,true),`meta ${META_D.seguidores.toLocaleString("pt-BR")}`)}
-      ${row("Custo/Seguidor",m.custoPorSeguidor>0?fBRLR(m.custoPorSeguidor):"—",statusColor(m.custoPorSeguidor,META_D.custoPorSeguidor,false),`meta ${fBRLR(META_D.custoPorSeguidor)}`)}
+      ${row("Visitas ao Perfil",m.profileVisits.toLocaleString("pt-BR"),`meta ${META_D.profileVisits.toLocaleString("pt-BR")}`,em(m.profileVisits,META_D.profileVisits,true))}
+      ${row("Custo/Visita",m.custoPorVisita>0?fBRLR(m.custoPorVisita):"—",`meta ${fBRLR(META_D.custoPorVisita)}`,em(m.custoPorVisita,META_D.custoPorVisita,false))}
+      ${row("Seguidores",m.seguidores.toLocaleString("pt-BR"),`meta ${META_D.seguidores.toLocaleString("pt-BR")}`,em(m.seguidores,META_D.seguidores,true))}
+      ${row("Custo/Seguidor",m.custoPorSeguidor>0?fBRLR(m.custoPorSeguidor):"—",`meta ${fBRLR(META_D.custoPorSeguidor)}`,em(m.custoPorSeguidor,META_D.custoPorSeguidor,false))}
       <div style="height:10px"></div>
-      ${row("Hook Rate",fPct(m.hookRate),statusColor(m.hookRate,META_D.hookRate,true),`meta ${fPct(META_D.hookRate)}`)}
-      ${row("Hold Rate",fPct(m.holdRate),statusColor(m.holdRate,META_D.holdRate,true),`meta ${fPct(META_D.holdRate)}`)}
+      ${row("Hook Rate",fPct(m.hookRate),`meta ${fPct(META_D.hookRate)}`,em(m.hookRate,META_D.hookRate,true))}
+      ${row("Hold Rate",fPct(m.holdRate),`meta ${fPct(META_D.holdRate)}`,em(m.holdRate,META_D.holdRate,true))}
       ${planRow}
     </div>`;
   }
   const planVal=S.manualPlanDist;
   function blockText(label,m){
-    return [`*${label}*`,"",`Investimento:\t${fBRLR(m.spend)}`,`Visitas ao Perfil:\t${m.profileVisits}`,`Custo/Visita:\t${m.custoPorVisita>0?fBRLR(m.custoPorVisita):"—"}`,`Seguidores:\t${m.seguidores}`,`Custo/Seguidor:\t${m.custoPorSeguidor>0?fBRLR(m.custoPorSeguidor):"—"}`,"",`Hook Rate:\t${fPct(m.hookRate)}`,`Hold Rate:\t${fPct(m.holdRate)}`].join("\n");
+    const pvE=em(m.profileVisits,META_D.profileVisits,true);
+    const cvE=em(m.custoPorVisita,META_D.custoPorVisita,false);
+    const sgE=em(m.seguidores,META_D.seguidores,true);
+    const csE=em(m.custoPorSeguidor,META_D.custoPorSeguidor,false);
+    const hrE=em(m.hookRate,META_D.hookRate,true);
+    const hoE=em(m.holdRate,META_D.holdRate,true);
+    return [
+      `*${label}*`,"",
+      `Investimento:\t${fBRLR(m.spend)}`,
+      `Visitas ao Perfil:\t${m.profileVisits}${pvE?"\t"+pvE+" meta "+META_D.profileVisits:""}`,
+      `Custo/Visita:\t${m.custoPorVisita>0?fBRLR(m.custoPorVisita):"—"}${cvE?"\t"+cvE+" meta "+fBRLR(META_D.custoPorVisita):""}`,
+      `Seguidores:\t${m.seguidores}${sgE?"\t"+sgE+" meta "+META_D.seguidores:""}`,
+      `Custo/Seguidor:\t${m.custoPorSeguidor>0?fBRLR(m.custoPorSeguidor):"—"}${csE?"\t"+csE+" meta "+fBRLR(META_D.custoPorSeguidor):""}`,
+      ``,
+      `Hook Rate:\t${fPct(m.hookRate)}${hrE?"\t"+hrE+" meta "+fPct(META_D.hookRate):""}`,
+      `Hold Rate:\t${fPct(m.holdRate)}${hoE?"\t"+hoE+" meta "+fPct(META_D.holdRate):""}`,
+    ].join("\n");
   }
   const resumoText=`*Resumo AGM - ${_distLabel()}*\t\t\n\n_${dateLabel}_\t\t\n\n📶 ${blockText("Total",tot)}\n\n⬅️ ${blockText("Ontem",ontem)}\n\n⬇️ ${blockText("Hoje",hoje)}${planVal!==null?`\n\nPlan até hj:\t${fBRLR(planVal)}`:""}`;
   el.innerHTML=`
