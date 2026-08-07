@@ -602,8 +602,8 @@ async function loadData(force=false){
     const dSeg={},dSegByCamp={},dSegByAd={};
     for(const r of parseSheet(distSegJ)){
       const d=toISO(r["Dia"]);if(!d)continue;
-      // Spend: "Valor usado (BRL)" usa ponto como decimal — parseFloat direto
-      const sp=parseFloat((r["Valor usado (BRL)"]||"0").replace(",","."))||0;
+      // Spend: "Valor usado (BRL)" ou "Valor gasto (BRL)" (Meta renomeou a coluna)
+      const sp=parseFloat((r["Valor usado (BRL)"]||r["Valor gasto (BRL)"]||"0").replace(",","."))||0;
       const cl=parseInt(r["Cliques no link"]||0)||0;
       const im=parseInt(r["Impressões"]||0)||0;
       const pv=parseInt(r["Visitas ao perfil do Instagram"]||0)||0;
@@ -657,7 +657,7 @@ async function loadData(force=false){
     const rSeg={},rSegByCamp={},rSegByAd={};
     for(const r of parseSheet(rentSegJ)){
       const d=toISO(r["Dia"]);if(!d)continue;
-      const sp=parseFloat((r["Valor usado (BRL)"]||"0").replace(",","."))||0;
+      const sp=parseFloat((r["Valor usado (BRL)"]||r["Valor gasto (BRL)"]||"0").replace(",","."))||0;
       const cl=parseInt(r["Cliques no link"]||0)||0;
       const im=parseInt(r["Impressões"]||0)||0;
       const pv=parseInt(r["Visitas ao perfil do Instagram"]||0)||0;
