@@ -2466,9 +2466,9 @@ function renderResumoSeg(){
     return `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px">
       <div style="font-size:13px;font-weight:700;color:var(--text-strong);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">${label}</div>
       ${investRow}
-      ${row("Visitas ao Perfil",m.profileVisits.toLocaleString("pt-BR"),`meta ${META_D.profileVisits.toLocaleString("pt-BR")}`,em(m.profileVisits,META_D.profileVisits,true))}
+      ${row("Visitas ao Perfil",m.profileVisits.toLocaleString("pt-BR"),"","")}
       ${row("Custo/Visita",m.custoPorVisita>0?fBRLR(m.custoPorVisita):"—",`meta ${fBRLR(META_D.custoPorVisita)}`,em(m.custoPorVisita,META_D.custoPorVisita,false))}
-      ${row("Seguidores",m.seguidores.toLocaleString("pt-BR"),`meta ${META_D.seguidores.toLocaleString("pt-BR")}`,em(m.seguidores,META_D.seguidores,true))}
+      ${row("Seguidores",m.seguidores.toLocaleString("pt-BR"),"","")}
       ${row("Custo/Seguidor",m.custoPorSeguidor>0?fBRLR(m.custoPorSeguidor):"—",`meta ${fBRLR(META_D.custoPorSeguidor)}`,em(m.custoPorSeguidor,META_D.custoPorSeguidor,false))}
       <div style="height:10px"></div>
       ${row("Hook Rate",fPct(m.hookRate),`meta ${fPct(META_D.hookRate)}`,em(m.hookRate,META_D.hookRate,true))}
@@ -2487,9 +2487,9 @@ function renderResumoSeg(){
     return [
       `*${label}*`,"",
       `Investimento:\t${fBRLR(m.spend)}`,
-      `Visitas ao Perfil:\t${m.profileVisits}${pvE?"\t"+pvE+" meta "+META_D.profileVisits:""}`,
+      `Visitas ao Perfil:\t${m.profileVisits}`,
       `Custo/Visita:\t${m.custoPorVisita>0?fBRLR(m.custoPorVisita):"—"}${cvE?"\t"+cvE+" meta "+fBRLR(META_D.custoPorVisita):""}`,
-      `Seguidores:\t${m.seguidores}${sgE?"\t"+sgE+" meta "+META_D.seguidores:""}`,
+      `Seguidores:\t${m.seguidores}`,
       `Custo/Seguidor:\t${m.custoPorSeguidor>0?fBRLR(m.custoPorSeguidor):"—"}${csE?"\t"+csE+" meta "+fBRLR(META_D.custoPorSeguidor):""}`,
       ``,
       `Hook Rate:\t${fPct(m.hookRate)}${hrE?"\t"+hrE+" meta "+fPct(META_D.hookRate):""}`,
